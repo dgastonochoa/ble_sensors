@@ -1,0 +1,22 @@
+---
+BasedOnStyle: LLVM
+BreakBeforeBraces: Linux
+IndentCaseLabels: false
+IndentWidth: 4
+ColumnLimit: 80
+TabWidth: 4
+UseTab: Never
+BinPackArguments: false
+BinPackParameters: false
+ExperimentalAutoDetectBinPacking: false
+PenaltyReturnTypeOnItsOwnLine: 1500
+PenaltyBreakBeforeFirstCallParameter: 1500
+AllowShortFunctionsOnASingleLine: Empty
+AllowAllParametersOfDeclarationOnNextLine: false
+AlignAfterOpenBracket: Align
+SortIncludes: false
+BreakBeforeBinaryOperators: None
+ReflowComments: true
+DerivePointerAlignment: false
+PointerAlignment: Left
+...
