@@ -3,8 +3,10 @@
 import logging
 import functools
 import datetime
+import re
 
 import atomic
+import sensors
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -26,57 +28,83 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         logging.debug('GET request detected')
 
-        try:
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
 
-            sensor_values = self._publish_data
+        sensor_values = self._publish_data
 
-            new_entries = []
-            for sens_id in range(4):
-                new_entries.append(self.format_sensor_read_entry(
-                    SENSOR_NAMES[sens_id],
-                    sensor_values[sens_id].get()))
+        formatted_sensor_values = self.sensor_values_to_html_table(
+            sensor_values)
 
-            joined_log_entries = '<br>'.join(new_entries)
-
-            html_content = f'''
-            <html>
-            <head>
+        html_content = f'''
+        <html>
+        <head>
+            <title>UDP Data</title>
             <style>
-                .monospaced {{
-                    font-family: Courier, "Courier New", monospace;
+                table {{
+                    border-spacing: 25px 10px;
                 }}
-                </style>
-                <title>UDP Data</title>
-            </head>
-            <body>
-                <h1>Data from UDP Server</h1>
-                <p class="monospaced">
-                    {joined_log_entries}
-                </p>
-            </body>
-            </html>
-            '''
+            </style>
+        </head>
+        <body>
+            <h1>Data from UDP Server</h1>
+            {formatted_sensor_values}
+        </body>
+        </html>
+        '''
 
-            self.wfile.write(html_content.encode())
-
-        except Exception:
-            logging.error("Error detected")
+        self.wfile.write(html_content.encode())
 
 
-    def parse_sensor_value(self, sensor_value):
-        return sensor_value.replace('sensor_value=', '')
+    def sensor_values_to_html_table(self, sensor_values):
+        sensor_values_formatted = []
+
+        current_timestamp = datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S')
+
+        for sens_id in range(4):
+            sensor_raw_value = sensor_values[sens_id].get()
+
+            sensor_raw_value_match = re.search(r'[0-9]+', sensor_raw_value)
+
+            sensor_human_read_value = '-'
+            if sensor_raw_value_match:
+                sensor_num_val = int(sensor_raw_value_match.group())
+
+                sensor_human_read_value = sensors.sens_get_human_readable_value(
+                    SENSOR_NAMES[sens_id],
+                    int(sensor_num_val)
+                )
+
+            sensor_values_formatted.append(self.get_html_table_entry(
+                current_timestamp,
+                SENSOR_NAMES[sens_id],
+                sensor_raw_value,
+                sensor_human_read_value))
+
+        table =  '<table border="0">'
+        table += '\n'.join(sensor_values_formatted)
+        table += '</table>'
+
+        return table
 
 
-    def format_sensor_read_entry(self, sensor_name, sensor_value):
-        current_timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    def get_html_table_entry(self,
+                             timestamp,
+                             sensor_name,
+                             sensor_raw_value,
+                             sensor_human_readable_value):
+        res = f'''
+            <tr>
+                <td>{timestamp}</td>
+                <td>{sensor_name}</td>
+                <td>{sensor_raw_value}</td>
+                <td>{sensor_human_readable_value}</td>
+            </tr>
+        '''
 
-        res = '{:<30}{:<50}{:<10}'.format(current_timestamp,
-                                          sensor_name,
-                                          self.parse_sensor_value(sensor_value))
-        return res.replace(' ', '&nbsp;')
+        return res
 
 
 def start_http_server(publish_data, host, port):
