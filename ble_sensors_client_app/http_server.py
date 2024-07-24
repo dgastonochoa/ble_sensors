@@ -5,6 +5,7 @@ import functools
 import datetime
 
 import atomic
+import sensors
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -34,10 +35,25 @@ class RequestHandler(BaseHTTPRequestHandler):
             sensor_values = self._publish_data
 
             new_entries = []
-            for sens_id in range(4):
+            for sens_id in range(1):
+
+                sensor_raw_value = sensor_values[sens_id].get()
+                sensor_raw_value = sensor_raw_value.replace('sensor_value=', '')
+
+                cut_index = sensor_raw_value.find('\n')
+                sensor_raw_value = sensor_raw_value[:cut_index]
+
+                if sensor_raw_value != '-':
+                    sensor_human_read_value = sensors.sens_get_human_readable_value(
+                        SENSOR_NAMES[sens_id],
+                        int(sensor_raw_value)
+                    )
+
                 new_entries.append(self.format_sensor_read_entry(
                     SENSOR_NAMES[sens_id],
-                    sensor_values[sens_id].get()))
+                    sensor_raw_value,
+                    sensor_human_read_value))
+
 
             joined_log_entries = '<br>'.join(new_entries)
 
@@ -62,20 +78,27 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             self.wfile.write(html_content.encode())
 
-        except Exception:
-            logging.error("Error detected")
+        except Exception as e:
+            # logging.error("Error detected: {}".format(e))
+            raise e
 
 
     def parse_sensor_value(self, sensor_value):
         return sensor_value.replace('sensor_value=', '')
 
 
-    def format_sensor_read_entry(self, sensor_name, sensor_value):
+    def format_sensor_read_entry(self,
+                                 sensor_name,
+                                 sensor_raw_value,
+                                 sensor_human_readable_value):
         current_timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        res = '{:<30}{:<50}{:<10}'.format(current_timestamp,
-                                          sensor_name,
-                                          self.parse_sensor_value(sensor_value))
+        res = '{:<20}{:<40}{:<10}{:<10}'.format(
+            current_timestamp,
+            sensor_name,
+            sensor_raw_value,
+            sensor_human_readable_value)
+
         return res.replace(' ', '&nbsp;')
 
 
