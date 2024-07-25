@@ -34,23 +34,22 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         sensor_values = self._publish_data
 
-        formatted_sensor_values = self.format_sensors_values(sensor_values)
+        formatted_sensor_values = self.sensor_values_to_html_table(
+            sensor_values)
 
         html_content = f'''
         <html>
         <head>
-        <style>
-            .monospaced {{
-                font-family: Courier, "Courier New", monospace;
-            }}
-            </style>
             <title>UDP Data</title>
+            <style>
+                table {{
+                    border-spacing: 25px 10px;
+                }}
+            </style>
         </head>
         <body>
             <h1>Data from UDP Server</h1>
-            <p class="monospaced">
-                {formatted_sensor_values}
-            </p>
+            {formatted_sensor_values}
         </body>
         </html>
         '''
@@ -58,9 +57,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(html_content.encode())
 
 
-
-    def format_sensors_values(self, sensor_values):
+    def sensor_values_to_html_table(self, sensor_values):
         sensor_values_formatted = []
+
+        current_timestamp = datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S')
 
         for sens_id in range(4):
             sensor_raw_value = sensor_values[sens_id].get()
@@ -76,28 +77,34 @@ class RequestHandler(BaseHTTPRequestHandler):
                     int(sensor_num_val)
                 )
 
-            sensor_values_formatted.append(self.sensor_entry_add_timestamp(
+            sensor_values_formatted.append(self.get_html_table_entry(
+                current_timestamp,
                 SENSOR_NAMES[sens_id],
                 sensor_raw_value,
                 sensor_human_read_value))
 
-        return '<br>'.join(sensor_values_formatted)
+        table =  '<table border="0">'
+        table += '\n'.join(sensor_values_formatted)
+        table += '</table>'
+
+        return table
 
 
-    def sensor_entry_add_timestamp(self,
-                                   sensor_name,
-                                   sensor_raw_value,
-                                   sensor_human_readable_value):
-        current_timestamp = datetime.datetime.now().strftime(
-            '%Y-%m-%d %H:%M:%S')
+    def get_html_table_entry(self,
+                             timestamp,
+                             sensor_name,
+                             sensor_raw_value,
+                             sensor_human_readable_value):
+        res = f'''
+            <tr>
+                <td>{timestamp}</td>
+                <td>{sensor_name}</td>
+                <td>{sensor_raw_value}</td>
+                <td>{sensor_human_readable_value}</td>
+            </tr>
+        '''
 
-        res = '{:<20}{:<40}{:<10}{:<10}'.format(
-            current_timestamp,
-            sensor_name,
-            sensor_raw_value,
-            sensor_human_readable_value)
-
-        return res.replace(' ', '&nbsp;')
+        return res
 
 
 def start_http_server(publish_data, host, port):
