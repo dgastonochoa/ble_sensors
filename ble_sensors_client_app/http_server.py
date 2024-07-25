@@ -3,6 +3,7 @@
 import logging
 import functools
 import datetime
+import re
 
 import atomic
 import sensors
@@ -27,71 +28,68 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         logging.debug('GET request detected')
 
-        try:
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
 
-            sensor_values = self._publish_data
+        sensor_values = self._publish_data
 
-            new_entries = []
-            for sens_id in range(4):
+        formatted_sensor_values = self.format_sensors_values(sensor_values)
 
-                sensor_raw_value = sensor_values[sens_id].get()
-                sensor_raw_value = sensor_raw_value.replace('sensor_value=', '')
+        html_content = f'''
+        <html>
+        <head>
+        <style>
+            .monospaced {{
+                font-family: Courier, "Courier New", monospace;
+            }}
+            </style>
+            <title>UDP Data</title>
+        </head>
+        <body>
+            <h1>Data from UDP Server</h1>
+            <p class="monospaced">
+                {formatted_sensor_values}
+            </p>
+        </body>
+        </html>
+        '''
 
-                cut_index = sensor_raw_value.find('\n')
-                sensor_raw_value = sensor_raw_value[:cut_index]
+        self.wfile.write(html_content.encode())
 
-                if sensor_raw_value != '-':
-                    sensor_human_read_value = sensors.sens_get_human_readable_value(
-                        SENSOR_NAMES[sens_id],
-                        int(sensor_raw_value)
-                    )
 
-                new_entries.append(self.format_sensor_read_entry(
+
+    def format_sensors_values(self, sensor_values):
+        sensor_values_formatted = []
+
+        for sens_id in range(4):
+            sensor_raw_value = sensor_values[sens_id].get()
+
+            sensor_raw_value_match = re.search(r'[0-9]+', sensor_raw_value)
+
+            sensor_human_read_value = '-'
+            if sensor_raw_value_match:
+                sensor_num_val = int(sensor_raw_value_match.group())
+
+                sensor_human_read_value = sensors.sens_get_human_readable_value(
                     SENSOR_NAMES[sens_id],
-                    sensor_raw_value,
-                    sensor_human_read_value))
+                    int(sensor_num_val)
+                )
+
+            sensor_values_formatted.append(self.sensor_entry_add_timestamp(
+                SENSOR_NAMES[sens_id],
+                sensor_raw_value,
+                sensor_human_read_value))
+
+        return '<br>'.join(sensor_values_formatted)
 
 
-            joined_log_entries = '<br>'.join(new_entries)
-
-            html_content = f'''
-            <html>
-            <head>
-            <style>
-                .monospaced {{
-                    font-family: Courier, "Courier New", monospace;
-                }}
-                </style>
-                <title>UDP Data</title>
-            </head>
-            <body>
-                <h1>Data from UDP Server</h1>
-                <p class="monospaced">
-                    {joined_log_entries}
-                </p>
-            </body>
-            </html>
-            '''
-
-            self.wfile.write(html_content.encode())
-
-        except Exception as e:
-            # logging.error("Error detected: {}".format(e))
-            raise e
-
-
-    def parse_sensor_value(self, sensor_value):
-        return sensor_value.replace('sensor_value=', '')
-
-
-    def format_sensor_read_entry(self,
-                                 sensor_name,
-                                 sensor_raw_value,
-                                 sensor_human_readable_value):
-        current_timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    def sensor_entry_add_timestamp(self,
+                                   sensor_name,
+                                   sensor_raw_value,
+                                   sensor_human_readable_value):
+        current_timestamp = datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S')
 
         res = '{:<20}{:<40}{:<10}{:<10}'.format(
             current_timestamp,

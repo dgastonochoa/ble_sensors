@@ -103,12 +103,20 @@ def sens_temp_estimate_temp(temp_read_val_mv: int) -> float:
 def sens_get_human_readable_value(sensor_name: str, read_val_mv: int) -> str:
     if sensor_name == 'SENSOR_MAGNETIC_FIELD':
         return str(sens_hall_effect_get_magnetic_pole(read_val_mv))
+
     elif sensor_name == 'SENSOR_PHOTOCELL':
-        return 'Light detected' if sens_photocell_light_detected(read_val_mv) else 'No light detected'
+        return ('Light detected'
+                if sens_photocell_light_detected(read_val_mv)
+                else 'No light detected')
+
     elif sensor_name == 'SENSOR_TEMP_DETECTOR':
         return str(sens_temp_estimate_temp(read_val_mv))
+
     elif sensor_name == 'SENSOR_IR_DETECTOR':
-        return 'IR detected' if sens_ir_infrared_source_detected(read_val_mv) else 'No IR detected'
+        return ('IR detected'
+                if sens_ir_infrared_source_detected(read_val_mv)
+                else 'No IR detected')
+
     else:
         raise ValueError('unknown sensor')
 
