@@ -35,7 +35,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             sensor_values = self._publish_data
 
             new_entries = []
-            for sens_id in range(1):
+            for sens_id in range(4):
 
                 sensor_raw_value = sensor_values[sens_id].get()
                 sensor_raw_value = sensor_raw_value.replace('sensor_value=', '')
