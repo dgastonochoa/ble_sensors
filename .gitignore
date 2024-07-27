@@ -1,5 +1,6 @@
-build/**
+**/build/**
 compile_commands.json
+sdkconfig.h
 sdkconfig.old
 .vscode/**
 **/__pycache__/**
