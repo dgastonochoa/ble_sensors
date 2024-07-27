@@ -436,6 +436,10 @@ static esp_err_t ble_conn_mngr_gap_start_scanning(
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (ble_conn_mngr_all_remotes_found(ctx)) {
+        return ESP_OK;
+    }
+
     const uint32_t duration_seconds = 3;
     esp_err_t rc = esp_ble_gap_start_scanning(duration_seconds);
     if (rc == ESP_OK) {
@@ -551,6 +555,10 @@ static void ble_conn_mngr_gap_handle_scan_result_ev(
             LOG_DBG(
                 "could not open any connection after scanning, retrying scan");
 
+            if (ble_conn_mngr_all_remotes_found(&ble_conn_mngr_ctx)) {
+                return;
+            }
+
             rc = ble_conn_mngr_gap_start_scanning(&ble_conn_mngr_ctx);
             if (rc != ESP_OK) {
                 LOG_ERR("error trying to start scanning");
@@ -578,6 +586,10 @@ static void ble_conn_mngr_gap_handle_scan_stop_ev(esp_ble_gap_cb_param_t* param)
 
         LOG_DBG(
             "could not open any connection after scanning, retrying scan");
+
+        if (ble_conn_mngr_all_remotes_found(&ble_conn_mngr_ctx)) {
+            return;
+        }
 
         rc = ble_conn_mngr_gap_start_scanning(&ble_conn_mngr_ctx);
         if (rc != ESP_OK) {
