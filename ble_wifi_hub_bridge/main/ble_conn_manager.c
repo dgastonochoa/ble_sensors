@@ -160,6 +160,14 @@ static void ble_conn_mngr_gattc_handle_open_ev(struct ble_conn_manager_ctx* ctx,
 
     ctx->opening = false;
 
+    if (param->open.status != ESP_GATT_OK) {
+        LOG_ERR("could not open device %s, status = 0x%x",
+                 app->target_remote->name,
+                 param->open.status
+        );
+        return;
+    }
+
     app->virt_conn_id = param->open.conn_id;
 
     esp_err_t rc = esp_ble_gatt_set_local_mtu(BLE_MTU);
@@ -313,13 +321,20 @@ static void ble_conn_mngr_gattc_handle_close_ev(
 
     ctx->closing = false;
 
+    app->virt_conn_id = VIRT_CONN_ID_CLOSED;
+    app->virt_conn_open = false;
+
     if (app != NULL && app->gattc_profile_ev_functor != NULL) {
-        app->gattc_profile_ev_functor->handler(app,
-                                         ESP_GATTC_CLOSE_EVT,
-                                         param,
-                                         app->gattc_profile_ev_functor->user_args);
+        app->gattc_profile_ev_functor->handler(
+            app,
+            ESP_GATTC_CLOSE_EVT,
+            param,
+            app->gattc_profile_ev_functor->user_args);
     }
 
+    // Notice this is here because it's expected that there will be only one
+    // virtual connection (app.) per physical device. TODO Possibly move it to
+    // the close handler.
     esp_err_t rc = ESP_OK;
     if (ble_conn_mngr_all_remotes_found(ctx)) {
         LOG_DBG("all remotes found, opening next app.");
@@ -341,10 +356,51 @@ static void ble_conn_mngr_gattc_handle_disconnect_ev(
     struct ble_gattc_app* app,
     esp_ble_gattc_cb_param_t* param)
 {
-    LOG_DBG("device with conn. id %d disconnected", param->open.conn_id);
-    app->target_remote->found = false;
-    app->virt_conn_id = VIRT_CONN_ID_CLOSED;
-    app->virt_conn_open = false;
+    LOG_DBG("device %s (found = %d) received a disconnect event, reason 0x%x",
+            app->target_remote->name,
+            app->target_remote->found ? 1 : 0,
+            param->disconnect.reason);
+
+    // It seems that the BLE stack raises this event for all apps. registered
+    // when an erroneous disconnection happens. Thus, if this remote is not
+    // found, there is nothing to disconnect, so ignore this event.
+    //
+    if (!app->target_remote->found) {
+        return;
+    }
+
+    // Handle an erroneous disconnection, that is, one not performed by this
+    // device.
+    //
+    // As explained above, this event is broadcasted in case of a failed
+    // connection attempt. This means some other devices might be reachable and
+    // found, and this will indeed mark them as not found and they will be
+    // re-found when a discovery event triggers. There doesn't seem to be a way
+    // around this.
+    if (param->disconnect.reason != ESP_GATT_CONN_TERMINATE_LOCAL_HOST) {
+
+        LOG_ERR("device %s (virtual conn. id = %d) unreachable, reason = 0x%x",
+                app->target_remote->name,
+                app->virt_conn_id,
+                param->disconnect.reason
+        );
+
+        // If there is an error opening the BLE device (e.g. because it's
+        // unreachable), the connection will disconnect without necessarily
+        // going through close, because the physical connection disconnected,
+        // but the virtual connection openning couldn't be stablished. Thus,
+        // set opening and closing here as the close event handler has
+        // potentially not being called.
+        ctx->opening = false;
+        ctx->closing = false;
+
+        app->target_remote->found = false;
+
+        esp_err_t rc = ble_conn_mngr_gap_start_scanning(ctx);
+        if (rc != ESP_OK) {
+            LOG_ERR("could not start scannig, error %d", rc);
+        }
+    }
 }
 
 static void ble_conn_mngr_gattc_cb(esp_gattc_cb_event_t event,
