@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -61,8 +62,18 @@ static esp_err_t ble_conn_mngr_gap_start_scanning(
 static esp_err_t ble_conn_mngr_gattc_open(struct ble_conn_manager_ctx* ctx,
                                           struct ble_gattc_app* app)
 {
-    if (ctx->opening || ctx->closing || ctx->scanning) {
-        LOG_ERR("could not open, currently opening, closing or scaning");
+    if (ctx->opening) {
+        LOG_ERR("could not open, currently opening");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (ctx->closing) {
+        LOG_ERR("could not open, currently closing");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (ctx->scanning) {
+        LOG_ERR("could not open, currently scaning");
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -71,8 +82,7 @@ static esp_err_t ble_conn_mngr_gattc_open(struct ble_conn_manager_ctx* ctx,
                                       app->target_remote->addr_type,
                                       true);
     if (rc == ESP_OK) {
-        LOG_DBG("opening virtual conn. %d from prf. %d to remote %s",
-                app->virt_conn_id,
+        LOG_DBG("opening app. id %d, remote %s",
                 app->app_id,
                 app->target_remote->name);
         ctx->opening = true;
@@ -111,6 +121,8 @@ static esp_err_t ble_conn_mngr_gattc_open_next_app(
 
     }
 
+    assert(next->target_remote->found);
+
     esp_err_t rc = ble_conn_mngr_gattc_open(ctx, next);
     if (rc != ESP_OK) {
         LOG_DBG("could not connect to %d, error %d", next->app_id, rc);
@@ -141,7 +153,10 @@ static void ble_conn_mngr_gattc_handle_open_ev(struct ble_conn_manager_ctx* ctx,
                                                struct ble_gattc_app* app,
                                                esp_ble_gattc_cb_param_t* param)
 {
-    LOG_DBG("%d: OPEN", app->app_id);
+    LOG_DBG("%d, %s: OPEN, status = 0x%x",
+            app->app_id,
+            app->target_remote->name,
+            param->open.status);
 
     ctx->opening = false;
 
@@ -336,6 +351,8 @@ static void ble_conn_mngr_gattc_cb(esp_gattc_cb_event_t event,
                                    esp_gatt_if_t gattc_if,
                                    esp_ble_gattc_cb_param_t* param)
 {
+    LOG_DBG("GATTC callback event %d, gattc iface. = %d", event, gattc_if);
+
     if (gattc_if == ESP_GATT_IF_NONE) {
         LOG_ERR("gattc if. none");
         return;
@@ -522,7 +539,7 @@ static void ble_conn_mngr_gap_handle_scan_result_ev(
         esp_err_t rc = ble_conn_mngr_gattc_open_next_app(&ble_conn_mngr_ctx);
         if (rc != ESP_OK) {
             if (ble_conn_mngr_ctx.gap_ev_functor != NULL) {
-                LOG_DBG("calling GAP functor");
+                LOG_DBG("could not open next app., calling GAP functor");
 
                 ble_conn_mngr_ctx.gap_ev_functor->handler(
                     ESP_GAP_BLE_SCAN_RESULT_EVT,
@@ -550,6 +567,7 @@ static void ble_conn_mngr_gap_handle_scan_stop_ev(esp_ble_gap_cb_param_t* param)
     esp_err_t rc = ble_conn_mngr_gattc_open_next_app(&ble_conn_mngr_ctx);
     if (rc != ESP_OK) {
         if (ble_conn_mngr_ctx.gap_ev_functor != NULL) {
+            LOG_DBG("could not open next app., calling GAP functor");
 
             ble_conn_mngr_ctx.gap_ev_functor->handler(
                 ESP_GAP_BLE_SCAN_STOP_COMPLETE_EVT,

@@ -55,7 +55,7 @@ struct ble_gattc_app* ble_conn_mngr_next_prf(struct ble_conn_manager_ctx* ctx)
 {
     for (size_t idx = ctx->curr_prf_idx + 1; idx < ctx->apps_cnt; idx++) {
         if (ctx->apps[idx]->target_remote->found) {
-            LOG_DBG("next profile index = %d", idx);
+            LOG_DBG("next profile index = %d, found = %d", idx, ctx->apps[idx]->target_remote->found ? 1 : 0);
             ctx->curr_prf_idx = idx;
             return ctx->apps[idx];
         }
@@ -63,7 +63,7 @@ struct ble_gattc_app* ble_conn_mngr_next_prf(struct ble_conn_manager_ctx* ctx)
 
     for (size_t idx = 0; idx <= ctx->curr_prf_idx; idx++) {
         if (ctx->apps[idx]->target_remote->found) {
-            LOG_DBG("next profile index = %d", idx);
+            LOG_DBG("next profile index = %d, found = %d", idx, ctx->apps[idx]->target_remote->found ? 1 : 0);
             ctx->curr_prf_idx = idx;
             return ctx->apps[idx];
         }
