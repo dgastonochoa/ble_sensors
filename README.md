@@ -12,6 +12,8 @@ Each of the FW images are built separately as standard espress-idf projects.
 
 To build each FW project:
 ```
+cd esp-idf
+./install.sh esp32
 cd $PROJECT_DIR
 source ../esp-idf/export.sh
 idf.py set-target esp32
