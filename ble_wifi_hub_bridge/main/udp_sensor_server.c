@@ -40,8 +40,8 @@ static int udp_sensor_server_get_socket(struct udp_sensor_server* udp_srvr)
 
     // Set timeout
     struct timeval timeout;
-    timeout.tv_sec = udp_srvr->timeout_seconds;
-    timeout.tv_usec = 0;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = udp_srvr->timeout_us;
     setsockopt(
         udp_srvr->sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
@@ -166,6 +166,6 @@ void udp_sensor_server_setup(struct udp_sensor_server* udp_srvr, uint16_t port)
     ESP_ERROR_CHECK(example_connect());
 
     udp_srvr->sock = -1;
-    udp_srvr->timeout_seconds = 1;
+    udp_srvr->timeout_us = 300e3; // TODO Avoid the eneed for this
     udp_srvr->port = port;
 }
