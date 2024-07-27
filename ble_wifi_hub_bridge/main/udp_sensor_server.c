@@ -26,7 +26,29 @@
 
 static const char *TAG = "UDP_SRVR";
 
-static int udp_sensor_server_get_socket(struct udp_sensor_server* udp_srvr)
+static struct timeval udp_sensor_server_get_timeval(uint32_t timeout_ms)
+{
+    struct timeval timeout = {0};
+    timeout.tv_sec = timeout_ms / 1000;
+    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    return timeout;
+}
+
+static void udp_sensor_server_set_timeout(struct udp_sensor_server* udp_srvr,
+                                          uint32_t timeout_ms)
+{
+    struct timeval timeout = udp_sensor_server_get_timeval(timeout_ms);
+
+    LOG_DBG("configuring UDP socket with timeout = %lld sec and %ld us",
+            timeout.tv_sec,
+            timeout.tv_usec);
+
+    setsockopt(
+        udp_srvr->sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+}
+
+static int udp_sensor_server_get_socket(struct udp_sensor_server* udp_srvr,
+                                        uint32_t timeout_ms)
 {
     udp_srvr->sever_sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     udp_srvr->sever_sock_addr.sin_family = AF_INET;
@@ -38,12 +60,7 @@ static int udp_sensor_server_get_socket(struct udp_sensor_server* udp_srvr)
         return udp_srvr->sock;
     }
 
-    // Set timeout
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = udp_srvr->timeout_us;
-    setsockopt(
-        udp_srvr->sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    udp_sensor_server_set_timeout(udp_srvr, timeout_ms);
 
     int err = bind(udp_srvr->sock,
                    (struct sockaddr *)&udp_srvr->sever_sock_addr,
@@ -107,28 +124,30 @@ static void udp_sensor_server_close_socket(struct udp_sensor_server* udp_srvr)
         return;
     }
 
+    LOG_DBG("closing UDP server");
+
     shutdown(udp_srvr->sock, 0);
     close(udp_srvr->sock);
     udp_srvr->sock = -1;
 }
 
-void udp_sensor_server_accept_requests(
-    struct udp_sensor_server* udp_srvr, uint32_t period_ms)
+void udp_sensor_server_accept_requests(struct udp_sensor_server* udp_srvr,
+                                       uint32_t period_ms)
 {
-    int rc = udp_sensor_server_get_socket(udp_srvr);
+    int rc = udp_sensor_server_get_socket(udp_srvr, period_ms);
 
     if (rc < 0) {
         LOG_ERR("Unable to create socket: error %d", udp_srvr->sock);
         return;
     }
 
-    TickType_t startTick = xTaskGetTickCount();
-    const TickType_t timeout = pdMS_TO_TICKS(period_ms);
+    TickType_t start_tick = xTaskGetTickCount();
+    uint32_t elapsed_ms = pdTICKS_TO_MS(xTaskGetTickCount() - start_tick);
 
-    while ((xTaskGetTickCount() - startTick) <= timeout) {
+    while (elapsed_ms < period_ms) {
         LOG_DBG("waiting for requests - [elapsed = %lu, timeout  = %lu]",
-                pdTICKS_TO_MS((xTaskGetTickCount() - startTick)),
-                pdTICKS_TO_MS(timeout));
+                elapsed_ms,
+                period_ms);
 
         int len = udp_sensor_server_wait_for_request(udp_srvr);
 
@@ -137,6 +156,8 @@ void udp_sensor_server_accept_requests(
                 LOG_ERR("recvfrom failed, error %d", errno);
                 break;
             } else {
+                elapsed_ms = pdTICKS_TO_MS(xTaskGetTickCount() - start_tick);
+                udp_sensor_server_set_timeout(udp_srvr, period_ms - elapsed_ms);
                 continue;
             }
         }
@@ -147,6 +168,9 @@ void udp_sensor_server_accept_requests(
             LOG_ERR("Error occurred during sending: errno %d", errno);
             break;
         }
+
+        elapsed_ms = pdTICKS_TO_MS(xTaskGetTickCount() - start_tick);
+        udp_sensor_server_set_timeout(udp_srvr, period_ms - elapsed_ms);
     }
 
     udp_sensor_server_close_socket(udp_srvr);
@@ -166,6 +190,5 @@ void udp_sensor_server_setup(struct udp_sensor_server* udp_srvr, uint16_t port)
     ESP_ERROR_CHECK(example_connect());
 
     udp_srvr->sock = -1;
-    udp_srvr->timeout_us = 300e3; // TODO Avoid the eneed for this
     udp_srvr->port = port;
 }
