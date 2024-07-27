@@ -399,6 +399,12 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# BLE/WiFi hub bridge app. configuration
+#
+CONFIG_UDP_SENSOR_SERVER_TIMEOUT=10000
+# end of BLE/WiFi hub bridge app. configuration
+
+#
 # Example Configuration
 #
 # CONFIG_EXAMPLE_DUMP_ADV_DATA_AND_SCAN_RESP is not set

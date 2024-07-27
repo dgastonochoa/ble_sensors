@@ -123,7 +123,7 @@ static void ble_sens_rd_handle_close(
 
     LOG_DBG("launching UDP server");
 
-    const uint32_t period_ms = 10000;
+    const uint32_t period_ms = CONFIG_UDP_SENSOR_SERVER_TIMEOUT;
     udp_sensor_server_accept_requests(
         ble_sens_rd->udp_sensor_server, period_ms);
 }

@@ -12,7 +12,7 @@ struct udp_sensor_server
     char rx_buffer[128];
     struct sockaddr_in sever_sock_addr;
     struct sockaddr client_sock_addr;
-    time_t timeout_seconds;
+    time_t timeout_us;
     uint16_t port;
 };
 

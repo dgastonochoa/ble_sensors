@@ -59,7 +59,7 @@ static void gap_ev_handler(esp_gap_ble_cb_event_t event,
                            void* user_args)
 {
     struct gap_functor_params* args = (struct gap_functor_params*)user_args;
-    const uint32_t period_ms = 10000;
+    const uint32_t period_ms = CONFIG_UDP_SENSOR_SERVER_TIMEOUT;
 
     switch (event)
     {
