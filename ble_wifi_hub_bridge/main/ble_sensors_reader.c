@@ -117,6 +117,8 @@ static void ble_sens_rd_handle_close(
         return;
     }
 
+    LOG_DBG("all sensors polled");
+
     ble_sens_rd_mark_sensors_unpolled(ble_sens_rd);
 
     LOG_DBG("launching UDP server");

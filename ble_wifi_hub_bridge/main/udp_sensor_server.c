@@ -126,7 +126,9 @@ void udp_sensor_server_accept_requests(
     const TickType_t timeout = pdMS_TO_TICKS(period_ms);
 
     while ((xTaskGetTickCount() - startTick) <= timeout) {
-        ESP_LOGD(TAG, "Waiting for data");
+        LOG_DBG("waiting for requests - [elapsed = %lu, timeout  = %lu]",
+                pdTICKS_TO_MS((xTaskGetTickCount() - startTick)),
+                pdTICKS_TO_MS(timeout));
 
         int len = udp_sensor_server_wait_for_request(udp_srvr);
 
